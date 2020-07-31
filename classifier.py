@@ -21,10 +21,12 @@ def plotIsBad(fname):
         bad = True
     if 'single' in fname:
         bad = True
-    if fname in os.listdir('training/notpulsar/'):
-        bad = True
-    if fname in os.listdir('training/pulsar/'):
-        bad = True
+    if os.path.exists('training/notpulsar')
+        if fname in os.listdir('training/notpulsar/'):
+            bad = True
+    if os.path.exists('training/notpulsar')
+        if fname in os.listdir('training/pulsar/'):
+            bad = True
     if fname == "classified_pulsar" or fname == "classified_notpulsar":
         bad = True
     return bad
