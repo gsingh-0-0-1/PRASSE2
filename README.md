@@ -4,7 +4,7 @@ Link to the first (non-machine-learning) PRASSE: https://github.com/gsingh-0-0-1
 
 In short, this repository is dedicated to cutting down the time we spend filtering through processed data from radio telescopes to look for pulsars.
 
-I've employed a pretty basic two-layer (one input, one output) neural network to solve this. As of now, it seems to be working very efficiently and very accurately - it can analyze ~40 plots per second and has yet to classify any of those plots incorrectly.
+I've employed a pretty basic two-layer (one input, one output) neural network to solve this. As of now, it seems to be working very efficiently - though the accuracy can waver from time to time. Neural networks, by nature, pick up on "features" that we can't really predict as well as we'd like, so as I continue to improve, re-train, and re-design the architecture of the neural network, the accuracy should improve.
 
 To clarify - this neural network looks specifically at the phase versus frequency - or phase versus sub-band - plot. The plots that it was trained on and the plots that I have tested the resulting network with are all obtained from the Pulsar Search Collaboratory (PSC), run out of West Virginia University and Green Bank Observatory. Unfortunately, this does end up limiting the format of the data that is inputted into this network - specifically, if your image file names do not contain the string "phasesubband", the network will assume that those files are plots from the PSC, and attempt to crop out the phase-sub-band plot from it. The network also assumes that it will be looking at two full phases in the plot.
 
