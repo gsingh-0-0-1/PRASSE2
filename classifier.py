@@ -7,6 +7,7 @@ from PIL import Image
 import sys
 from getfeatures import getfeatures
 from getfeatures import neurnetfeatures
+from getfeatures import neurnetfeatures2
 import time
 import shutil
 import cv2
@@ -24,7 +25,7 @@ def plotIsBad(fname):
     if os.path.exists('training/notpulsar'):
         if fname in os.listdir('training/notpulsar/'):
             bad = True
-    if os.path.exists('training/notpulsar'):
+    if os.path.exists('training/pulsar'):
         if fname in os.listdir('training/pulsar/'):
             bad = True
     if fname == "classified_pulsar" or fname == "classified_notpulsar":
@@ -71,17 +72,13 @@ for fname in os.listdir(startdir):
         print('error')
         break
 
-    #check for images that are only phasesubband plots
-    if "phasesub" in fname:
-        phasesubband = img
-    else:
-        phasesubband = img[170:355, 320:470]
+    phasesubband = img[170:355, 320:470]
 
-    phasesubband = cv2.resize(phasesubband, dsize=(150, 185))
+    #phasesubband = cv2.resize(phasesubband, dsize=(150, 185))
 
     f = neurnetfeatures(phasesubband)
-    final = f * thetas
-    val = 1 / (1 + np.e ** (np.sum(final)))
+    final = np.dot(f, thetas)
+    val = 1 / (1 + np.e ** final)
     displayname = fname
     if len(displayname) > 30:
         displayname = fname[:10] + "..." + fname[-15:]

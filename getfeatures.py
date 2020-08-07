@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from PIL import Image
+import cv2
 
 args = np.array([0.20900506288154352, 
 				0.99998432930365, 
@@ -36,6 +38,18 @@ def getfeatures(phasesubband):
 	return x1, x2
 
 def neurnetfeatures(phasesubband):
+	#phasesubband = cv2.resize(phasesubband, (37, 30))
+	mi = np.argmin(np.sum(np.sum(phasesubband, axis=2), axis=0))
+	new = np.roll(phasesubband, -mi, axis=1)
+	new = np.sum(new, axis=2) / 3
+	new = new.flatten()
+	new = new/255
+	new = new - 0.5
+	new = np.concatenate(([1], new))
+	return new
+
+def neurnetfeatures2(phasesubband):
+	phasesubband = cv2.resize(phasesubband, (37, 30))
 	mi = np.argmin(np.sum(np.sum(phasesubband, axis=2), axis=0))
 	new = np.roll(phasesubband, -mi, axis=1)
 	new = np.sum(new, axis=2) / 3
