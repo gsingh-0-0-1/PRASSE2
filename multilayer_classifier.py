@@ -28,15 +28,27 @@ def updateProgressBar(value):
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # FATAL
 logging.getLogger('tensorflow').setLevel(logging.FATAL)
 
+models = ["arc_base_1_kernel_3_3_padding_same",
+		"arc_base_1_kernel_3_1_padding_same",
+		"arc_base_1_kernel_3_3_padding_none",
+		"arc_base_1_kernel_3_1_padding_none"]
+
 print("Please select a model to load (enter the corresponding number - 1, 2...): ")
-print("[1] arc_base_1_kernel_3_3")
-print("[2] arc_base_1_kernel_3_1")
+for model in range(len(models)):
+	print("[" + str(model + 1) + "]" + " " + str(models[model]))
+
 model_to_load = input(": ")
 
-if model_to_load == "1":
+model_to_load = models[int(model_to_load)-1]
+
+model_to_load = 'models/' + model_to_load
+
+'''if model_to_load == "1":
 	model_to_load = "arc_base_1_kernel_3_3"
 if model_to_load == "2":
 	model_to_load = "arc_base_1_kernel_3_1"
+if model_to_load == "3":
+	model_to_load = "arc_base_2_kernel_3_1"'''
 
 model = tf.keras.models.load_model(model_to_load)
 
@@ -73,6 +85,9 @@ for fname in os.listdir(test_data_directory):
 
 	img = Image.open(test_data_directory+fname)
 	phasesubband = np.array(img)[170:355, 320:470][:, :, :3]
+	if np.shape(phasesubband) != (185, 150, 3):
+		print ("Input Shape Error // Non-fatal // Skipping to next input")
+		continue
 
 	#if np.shape(phasesubband)[2] > 3:
 	#	phasesubband = phasesubband[:, :, :3]
@@ -81,9 +96,6 @@ for fname in os.listdir(test_data_directory):
 	names += [fname]
 
 	items += 1
-
-	if items >= 1000:
-		break
 
 	updateProgressBar( round((items/num_plots) * 100, 1) )
 
