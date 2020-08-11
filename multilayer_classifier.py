@@ -15,6 +15,9 @@ import time
 import pydot
 import pydotplus
 from pydotplus import graphviz
+import multiprocessing
+import cv2
+import glob
 
 print("Done importing.")
 print()
@@ -31,7 +34,8 @@ logging.getLogger('tensorflow').setLevel(logging.FATAL)
 models = ["arc_base_1_kernel_3_3_padding_same",
 		"arc_base_1_kernel_3_1_padding_same",
 		"arc_base_1_kernel_3_3_padding_none",
-		"arc_base_1_kernel_3_1_padding_none"]
+		"arc_base_1_kernel_3_1_padding_none",
+		"model_dev"]
 
 print("Please select a model to load (enter the corresponding number - 1, 2...): ")
 for model in range(len(models)):
@@ -42,13 +46,6 @@ model_to_load = input(": ")
 model_to_load = models[int(model_to_load)-1]
 
 model_to_load = 'models/' + model_to_load
-
-'''if model_to_load == "1":
-	model_to_load = "arc_base_1_kernel_3_3"
-if model_to_load == "2":
-	model_to_load = "arc_base_1_kernel_3_1"
-if model_to_load == "3":
-	model_to_load = "arc_base_2_kernel_3_1"'''
 
 model = tf.keras.models.load_model(model_to_load)
 
@@ -65,89 +62,131 @@ names = []
 
 print("Loading data...")
 
-num_plots = len(os.listdir(test_data_directory))
+num_plots = len([i for i in os.listdir(test_data_directory) if not i.startswith(".")])
 
-load_start_time = time.time()
+print()
+print("Please specify a limit for the number of plots to load. To set the limit to infinity, press enter.")
+max_plots = input(": ")
 
-for fname in os.listdir(test_data_directory):
-	if fname[0] == '.' or fname == 'temp.png' or 'single' in fname:
-		continue
-	try:
-		img = Image.open(test_data_directory+fname)
-		img = np.array(img)
+try:
+	max_plots = int(max_plots)
+except ValueError:
+	max_plots = num_plots
+
+print(max_plots)
+
+batches = int(max_plots / 1000) + 1
+
+total_load_time = 0
+total_classify_time = 0
+
+listed_plots = [i for i in os.listdir(test_data_directory) if not i.startswith(".")]
+
+for batch in range(batches):
+	l = []
+	names = []
+	thisitems = 0
+
+	if batch == batches - 1:
+		thismax = max_plots % 1000
+	else:
+		thismax = 1000
+
+	print("------------------------------")
+	print("Starting batch " + str(batch + 1) + " / " + str(batches))
+	print("------------------------------")
+
+	load_start_time = time.time()
+
+	for plot in range(batch * 1000, batch * 1000 + thismax):
+		fname = listed_plots[plot]
+		if fname[0] == '.' or fname == 'temp.png' or 'single' in fname:
+			continue
+		img = cv2.imread(test_data_directory+fname)[170:355, 320:470]
 		if len(np.shape(img)) < 3:
 			print ("Input Shape Error // Non-fatal // Skipping to next input")
 			continue
-	except OSError:
-		print("OSError // Non-fatal // Skipping to next input")
-		continue
+
+		l += [img]
+		names += [fname]
+
+		thisitems += 1
+
+		updateProgressBar( round((thisitems/thismax) * 100, 1) )
+
+		del(img)
+
+	load_end_time = time.time()
+
+	items += thisitems
+
+	total_load_time += (load_end_time - load_start_time)
+
+	print()
+
+	print("Data loaded. Classifying...")
+
+	l = np.array(l)
+
+	start_time = time.time()
+
+	predicted = model.predict_classes(l)
+
+	end_time = time.time()
+
+	total_classify_time += (end_time - start_time)
+
+	print("Done classifying. Cleaning up output...")
+
+	names = np.array(names)
+
+	output = np.column_stack((names, predicted))
+
+	output[np.where(output == '0')] = "Not Pulsar"
+	output[np.where(output == '1')] = "Pulsar"
+
+	unique, counts = np.unique(output, return_counts=True)
+
+	counts = dict(zip(unique, counts))
+
+	if "Pulsar" not in counts.keys():
+		counts["Pulsar"] = 0
+
+	if "Not Pulsar" not in counts.keys():
+		counts["Not Pulsar"] = 0
+	 
+	for item in range(len(output)):
+		fname = output[item, 0]
+		displayname = fname
+		if len(displayname) > 100:
+			displayname = fname[:50] + "..." + fname[-40:]
+		while len(displayname) < 100:
+			displayname = displayname + "-"
+
+		print(displayname + "\t" + str(output[item, 1]))
 
 
-	img = Image.open(test_data_directory+fname)
-	phasesubband = np.array(img)[170:355, 320:470][:, :, :3]
-	if np.shape(phasesubband) != (185, 150, 3):
-		print ("Input Shape Error // Non-fatal // Skipping to next input")
-		continue
+	print("Pulsars: " + str(counts["Pulsar"]))
+	print("Not Pulsars: " + str(counts["Not Pulsar"]))
+	print("Classification time: " + "\t" + str(1000 * (end_time - start_time)) + "ms")
+	print("Items: " + str(thisitems))
+	print("Load time: " + "\t" + str(1000 * (load_end_time - load_start_time)) + "ms")
+	print("Avg Load Rate: " + str(round(thisitems / (load_end_time - load_start_time), 3)) + " plots / s")
+	print("Avg Classification Rate: " + str(round(thisitems / (end_time - start_time), 3)) + " plots / s")
 
-	#if np.shape(phasesubband)[2] > 3:
-	#	phasesubband = phasesubband[:, :, :3]
+	l = None
+	names = None
+	output = None
+	counts = None
+	unique = None
 
-	l += [phasesubband]
-	names += [fname]
-
-	items += 1
-
-	updateProgressBar( round((items/num_plots) * 100, 1) )
-
-load_end_time = time.time()
-
-print()
-
-print("Data loaded. Classifying...")
-
-l = np.array(l)
-
-start_time = time.time()
-
-predicted = model.predict_classes(l)
-
-end_time = time.time()
-
-print("Done classifying. Cleaning up output...")
-
-names = np.array(names)
-
-output = np.column_stack((names, predicted))
-
-output[np.where(output == '0')] = "Not Pulsar"
-output[np.where(output == '1')] = "Pulsar"
-
-unique, counts = np.unique(output, return_counts=True)
-
-counts = dict(zip(unique, counts))
-
-if "Pulsar" not in counts.keys():
-	counts["Pulsar"] = 0
-
-if "Not Pulsar" not in counts.keys():
-	counts["Not Pulsar"] = 0
- 
-for item in range(len(output)):
-	fname = output[item, 0]
-	displayname = fname
-	if len(displayname) > 30:
-		displayname = fname[:10] + "..." + fname[-15:]
-	while len(displayname) < 30:
-		displayname = displayname + "-"
-
-	print(displayname + "\t" + str(output[item, 1]))
-
-
-print("Pulsars: " + str(counts["Pulsar"]))
-print("Not Pulsars: " + str(counts["Not Pulsar"]))
-print("Classification time: " + "\t" + str(1000 * (end_time - start_time)) + "ms")
+print("------------------------------------------------------------")
+print("Finished " + str(batches) + " batches")
+print("Overall Statistics:")
+print("Classification time: " + "\t" + str(1000 * (total_classify_time)) + "ms")
 print("Items: " + str(items))
-print("Avg Load Rate: " + str(round(items / (load_end_time - load_start_time), 3)) + " plots / s")
-print("Avg Classification Rate: " + str(round(items / (end_time - start_time), 3)) + " plots / s")
+print("Load time: " + "\t" + str(1000 * (total_load_time)) + "ms")
+print("Avg Load Rate: " + str(round(items / (total_load_time), 3)) + " plots / s")
+print("Avg Classification Rate: " + str(round(items / (total_classify_time), 3)) + " plots / s")
 
 
